@@ -9,10 +9,11 @@ export interface EmailCategory {
 async function classifyEmail(
   subject: string,
   from: string,
-  categories: string[],
+  categories: { name: string; description?: string }[],
   snippet?: string
 ): Promise<EmailCategory> {
-  const categoryList = categories.map((c) => `- ${c}`).join("\n");
+  // Build the prompt including descriptions
+  const categoryList = categories.map(c => `- ${c.name}${c.description ? `: ${c.description}` : ''}`).join("\n");
 
   const prompt = `Please classify this email into one of these categories:
 ${categoryList}

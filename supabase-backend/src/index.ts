@@ -24,7 +24,9 @@ app.use(express.json());
 app.use('/categories', categoriesRouter);
 app.use('/users', usersRouter);
 app.use('/emails', emailsRouter);
-
+app.get("/ping", (req, res) => {
+  res.send("pong");
+});
 app.listen(port, () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
