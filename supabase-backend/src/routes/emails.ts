@@ -4,6 +4,8 @@ import { requireAuth } from '../utils/auth.js';
 import { getGoogleAuth } from '../google/googleAuth.js';
 import { google } from 'googleapis';
 import classifyEmail from '../utils/classifyEmail.js';
+import { emailQueue } from "../queue/emailQueue.js";
+import { Mutex } from "async-mutex";
 
 const router = Router();
 
@@ -54,22 +56,29 @@ router.post('/gmail/watch', requireAuth(), async (req: Request, res: Response) =
   }
 });
 
-router.post('/gmail/notifications', async (req: Request, res: Response) => {
-  console.log("Incoming Gmail notification...");
+const userLocks = new Map<string, Mutex>();
+function getLockForUser(userId: string) {
+  if (!userLocks.has(userId)) {
+    userLocks.set(userId, new Mutex());
+  }
+  return userLocks.get(userId)!;
+}
+router.post("/gmail/notifications", async (req: Request, res: Response) => {
+  console.log("📨 Incoming Gmail notification...");
   try {
     if (!req.body?.message?.data) {
-      console.warn("No message data in request");
+      console.warn("⚠️ No message data in request");
       return res.sendStatus(400);
     }
 
-    const messageStr = Buffer.from(req.body.message.data, 'base64').toString();
+    const messageStr = Buffer.from(req.body.message.data, "base64").toString();
     console.log("Decoded message:", messageStr);
 
     let data: any;
     try {
       data = JSON.parse(messageStr);
     } catch (err) {
-      console.error("Failed to parse JSON from message:", err);
+      console.error("❌ Failed to parse JSON from message:", err);
       return res.sendStatus(400);
     }
 
@@ -78,123 +87,104 @@ router.post('/gmail/notifications', async (req: Request, res: Response) => {
 
     // Fetch user
     const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', emailAddress)
+      .from("users")
+      .select("*")
+      .eq("email", emailAddress)
       .single();
 
     if (error) {
-      console.error("Supabase error fetching user:", error);
+      console.error("❌ Supabase error fetching user:", error);
       return res.sendStatus(500);
     }
     if (!user) {
-      console.warn("No user found for email:", emailAddress);
-      return res.sendStatus(200); // Not an error
-    }
-
-    console.log("User found:", user);
-
-    // If first time, just set last_history_id
-    if (!user.last_history_id) {
-      console.log("First notification for this user, setting last_history_id");
-      await supabase.from('users')
-        .update({ last_history_id: historyId })
-        .eq('id', user.id);
+      console.warn("⚠️ No user found for email:", emailAddress);
       return res.sendStatus(200);
     }
 
-    console.log("Fetching Gmail history...");
-
-    const auth = await getGoogleAuth(user.id);
-    const gmail = google.gmail({ version: 'v1', auth });
-
-    let history;
+    const release = await getLockForUser(user.id).acquire(); // 👈 lock per user
     try {
-      history = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: user.last_history_id,
-        historyTypes: ['messageAdded'],
-      });
-    } catch (err) {
-      console.error("Error fetching Gmail history:", err);
-      // Maybe historyId expired → reset?
-      return res.sendStatus(500);
-    }
+      // Re-fetch fresh user inside lock
+      const { data: freshUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-    const newMessages = history.data.history?.flatMap(h => h.messages || []) || [];
-    console.log("New messages found:", newMessages.length);
+      if (!freshUser) {
+        console.warn("⚠️ User vanished during processing");
+        return res.sendStatus(200);
+      }
 
-    // Update last_history_id immediately
-    await supabase
-      .from('users')
-      .update({ last_history_id: historyId })
-      .eq('id', user.id);
+      // First-time setup → set last_history_id and backfill
+      if (!freshUser.last_history_id) {
+        console.log("✨ First notification, setting last_history_id");
 
-    // Process each message
-    for (const msg of newMessages) {
-      console.log("Processing message ID:", msg.id);
+        await supabase.from("users")
+          .update({ last_history_id: historyId })
+          .eq("id", freshUser.id);
 
-      let msgDetail;
+        // Kick off backfill (async, no blocking here)
+        const auth = await getGoogleAuth(freshUser.id);
+        const gmail = google.gmail({ version: "v1", auth });
+
+        import("../utils/backfillLastMonthEmails.js").then(({ backfillLastMonthEmails }) => {
+          backfillLastMonthEmails(freshUser.id, gmail)
+            .then(() => console.log(`✅ Backfill started for ${freshUser.email}`))
+            .catch(err => console.error("❌ Backfill failed:", err));
+        });
+
+        return res.sendStatus(200);
+      }
+
+      // 👇 Atomic update: only move forward
+      const { data: updatedUser } = await supabase
+        .from("users")
+        .update({ last_history_id: historyId })
+        .eq("id", freshUser.id)
+        .lt("last_history_id", historyId)
+        .select()
+        .single();
+
+      if (!updatedUser) {
+        console.log("⚠️ Stale/duplicate notification, skipping.");
+        return res.sendStatus(200);
+      }
+
+      console.log("🔍 Fetching Gmail history...");
+      const auth = await getGoogleAuth(freshUser.id);
+      const gmail = google.gmail({ version: "v1", auth });
+
+      let history;
       try {
-        msgDetail = await gmail.users.messages.get({
-          userId: 'me',
-          id: msg.id,
-          format: 'full', // Use 'full' to get snippet
+        history = await gmail.users.history.list({
+          userId: "me",
+          startHistoryId: freshUser.last_history_id,
+          historyTypes: ["messageAdded"],
         });
       } catch (err) {
-        console.error("Error fetching message details:", err);
-        continue; // Skip this message
+        console.error("❌ Error fetching Gmail history:", err);
+        return res.sendStatus(500);
       }
 
-      const headers = msgDetail.data.payload?.headers || [];
-      const subject = headers.find(h => h.name === 'Subject')?.value || '';
-      const from = headers.find(h => h.name === 'From')?.value || '';
-      const snippet = msgDetail.data.snippet || '';
-      const { data: categoriesData, error: catError } = await supabase
-        .from('categories')
-        .select('name, description')
-        .eq('user_id', user.id);
+      const newMessages = history.data.history?.flatMap(h => h.messages || []) || [];
+      console.log("📬 New messages found:", newMessages.length);
 
-      if (catError || !categoriesData) {
-        console.error("Failed to fetch categories:", catError);
-        categoriesData = [];
-      }
-
-      let classification: any;
-      try {
-        classification = await classifyEmail(
-          subject,
-          from,
-          categoriesData,
-          snippet
+      for (const msg of newMessages) {
+        await emailQueue.add(
+          "processEmail",
+          { userId: freshUser.id, gmailId: msg.id },
+          { jobId: `${freshUser.id}:${msg.id}` } // 👈 deduplicate jobs
         );
-        console.log("Classification result:", classification);
-      } catch (err) {
-        console.error("Classification failed for message ID:", msg.id, err);
-        classification = { error: "classification_failed" };
       }
 
-      try {
-        await supabase.from('emails').insert({
-          user_id: user.id,
-          gmail_id: msg.id,
-          subject,
-          sender: from,
-          snippet,
-          classification: JSON.stringify(classification),
-        });
-        console.log("Email inserted:", msg.id);
-      } catch (err) {
-        console.error("Failed to insert email ID:", msg.id, err);
-      }
+      console.log("✅ Finished processing Gmail notification");
+      return res.sendStatus(200);
+    } finally {
+      release(); // release per-user lock
     }
-
-    console.log("Finished processing Gmail notification");
-    res.sendStatus(200);
-
   } catch (err: any) {
-    console.error("Unexpected error in /gmail/notifications:", err);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Unexpected error in /gmail/notifications:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -257,5 +247,26 @@ router.post('/classify-emails', requireAuth(), async (req: Request, res: Respons
     res.status(500).json({ error: e.message });
   }
 });
+
+async function backfillLastMonthEmails(userId: string, gmail: any) {
+  // Fetch last 30 days worth of messages
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+  const { data: messagesData } = await gmail.users.messages.list({
+    userId: "me",
+    q: `after:${Math.floor(oneMonthAgo.getTime() / 1000)}`, // Gmail search query
+    maxResults: 500, // paginate if needed
+  });
+
+  const messages = messagesData.messages || [];
+
+  for (const msg of messages) {
+    await emailQueue.add("processEmail", {
+      userId,
+      gmailId: msg.id,
+    });
+  }
+}
 
 export default router;

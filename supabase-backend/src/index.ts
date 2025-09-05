@@ -5,8 +5,14 @@ import usersRouter from './routes/users.js';
 import emailsRouter from './routes/emails.js';
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPath = path.resolve(__dirname, "../../.env");
+dotenv.config({ path: envPath });
 
 const app = express();
 const port = process.env.PORT || 3000;
