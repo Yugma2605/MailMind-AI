@@ -1,10 +1,10 @@
-import { Worker, Queue, Job } from "bullmq";
+import { Worker, Queue } from "bullmq";
 import { supabase } from "../supabase/config.js";
 import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
 import { redis } from "../redis/redis.js";
 import classifyEmail from "../utils/classifyEmail.js";
-
+import type { Job } from "bullmq";
 // Create a Queue instance to check backlog
 const emailQueue = new Queue("emailQueue", { connection: redis });
 
