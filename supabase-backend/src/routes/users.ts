@@ -5,7 +5,15 @@ import { requireAuth, setSessionCookie, signSessionJWT } from "../utils/auth.js"
 import { oauth2Client } from "../google/googleClient.js";
 import { supabase } from "../supabase/config.js";
 import { encrypt } from "../utils/crypto.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from 'dotenv';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPath = path.resolve(__dirname, "../../.env");
+dotenv.config({ path: envPath });
 const GMAIL_SCOPES = [
     "openid",
     "email",
@@ -70,7 +78,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     setSessionCookie(res, session);
 
     // Redirect to frontend (or API response)
-    res.redirect("http://localhost:8081/welcome"); // adjust to your frontend
+    res.redirect(`${process.env.FRONTEND_URL}/welcome`); // adjust to your frontend
   } catch (err: any) {
     console.error(err);
     res.status(500).send(err.message);
