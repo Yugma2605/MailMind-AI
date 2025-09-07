@@ -1,4 +1,4 @@
-import { Worker, Queue } from "bullmq";
+import { Worker, Queue, Job } from "bullmq";
 import { supabase } from "../supabase/config.js";
 import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
@@ -10,7 +10,8 @@ const emailQueue = new Queue("emailQueue", { connection: redis });
 
 export const emailWorker = new Worker(
   "emailQueue",
-  async (job) => {
+  async (job: Job<{ userId: string; gmailId: string }>) => {
+    console.log("Hi")
     const { userId, gmailId } = job.data;
     console.log("📩 Processing email job:", job.id, "for user:", userId);
 
