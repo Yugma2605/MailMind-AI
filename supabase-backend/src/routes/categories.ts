@@ -104,4 +104,50 @@ router.get('/', requireAuth(), async (req: Request, res: Response) => {
   return res.json(categories); // ✅ array
 });
 
+// PUT /categories/:id
+router.put('/:id', requireAuth(), async (req: Request, res: Response) => {
+  const user_id = (req as any).user_id;
+  const { id } = req.params;
+  const { name, description } = req.body;
+
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name, description, updated_at: new Date() })
+      .eq('id', id)
+      .eq('user_id', user_id)
+      .select();
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Category not found or not yours' });
+    }
+
+    res.json(data[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /categories/:id
+router.delete('/:id', requireAuth(), async (req: Request, res: Response) => {
+  const user_id = (req as any).user_id;
+  const { id } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user_id);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 export default router;

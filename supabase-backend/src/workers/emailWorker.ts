@@ -1,9 +1,12 @@
-import { Worker } from "bullmq";
+import { Worker, Queue } from "bullmq";
 import { supabase } from "../supabase/config.js";
 import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
 import { redis } from "../redis/redis.js";
 import classifyEmail from "../utils/classifyEmail.js";
+
+// Create a Queue instance to check backlog
+const emailQueue = new Queue("emailQueue", { connection: redis });
 
 export const emailWorker = new Worker(
   "emailQueue",
@@ -46,7 +49,11 @@ export const emailWorker = new Worker(
       classification: JSON.stringify(classification),
     });
 
-    console.log(`✅ Processed email ${gmailId} for user ${userId}`);
+    // Check backlog
+    const backlog = await emailQueue.getWaitingCount();
+    console.log(
+      `✅ Processed email ${gmailId} for user ${userId}. 📊 Remaining backlog: ${backlog}`
+    );
   },
   {
     connection: redis,
