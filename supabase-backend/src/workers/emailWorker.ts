@@ -4,13 +4,11 @@ import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
 import { redis } from "../redis/redis.js";
 import classifyEmail from "../utils/classifyEmail.js";
-import type { Job } from "bullmq/dist/esm/classes/job"; 
-// Create a Queue instance to check backlog
 const emailQueue = new Queue("emailQueue", { connection: redis });
 
 export const emailWorker = new Worker(
   "emailQueue",
-  async (job: Job<{ userId: string; gmailId: string }>) => {
+  async (job : any) => {
     console.log("Hi")
     const { userId, gmailId } = job.data;
     console.log("📩 Processing email job:", job.id, "for user:", userId);
