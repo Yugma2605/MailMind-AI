@@ -25,11 +25,8 @@ const Welcome = () => {
 
   const fetchUserData = async () => {
     try {
-      const token = localStorage.getItem("token"); // wherever you stored JWT
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include", // Include cookies for session
       });
       
       if (response.ok) {
