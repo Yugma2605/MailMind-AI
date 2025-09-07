@@ -4,7 +4,7 @@ import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
 import { redis } from "../redis/redis.js";
 import classifyEmail from "../utils/classifyEmail.js";
-import type { Job } from "bullmq";
+import type { Job } from "bullmq/dist/esm/classes/job"; 
 // Create a Queue instance to check backlog
 const emailQueue = new Queue("emailQueue", { connection: redis });
 
