@@ -127,11 +127,9 @@ router.post("/gmail/notifications", async (req: Request, res: Response) => {
         const auth = await getGoogleAuth(freshUser.id);
         const gmail = google.gmail({ version: "v1", auth });
 
-        import("../utils/backfillLastMonthEmails.js").then(({ backfillLastMonthEmails }) => {
-          backfillLastMonthEmails(freshUser.id, gmail)
-            .then(() => console.log(`✅ Backfill started for ${freshUser.email}`))
-            .catch(err => console.error("❌ Backfill failed:", err));
-        });
+        backfillLastMonthEmails(freshUser.id, gmail)
+        .then(() => console.log(`✅ Backfill started for ${freshUser.email}`))
+        .catch(err => console.error("❌ Backfill failed:", err));
 
         return res.sendStatus(200);
       }
