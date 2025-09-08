@@ -17,7 +17,7 @@ dotenv.config({ path: envPath });
 const app = express();
 const port = process.env.PORT || 3000;
 const allowedOrigins = [
-  "http://localhost:5173",
+  "https://mail-mind-ai-frontend.vercel.app",
   "http://localhost:8081",
 ];
 
