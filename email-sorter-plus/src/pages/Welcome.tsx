@@ -19,7 +19,18 @@ const Welcome = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is authenticated by trying to fetch user data
+    // Grab token from URL if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get("token");
+
+    if (tokenFromUrl) {
+      localStorage.setItem("token", tokenFromUrl);
+      // Clean URL so token is not visible
+      const newUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+
+    // Now fetch user data
     fetchUserData();
   }, []);
 

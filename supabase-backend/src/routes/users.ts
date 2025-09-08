@@ -78,7 +78,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     setSessionCookie(res, session);
 
     // Redirect to frontend (or API response)
-    res.redirect(`${process.env.FRONTEND_URL}/welcome`); // adjust to your frontend
+    res.redirect(`${process.env.FRONTEND_URL}/welcome?token=${session}`);
   } catch (err: any) {
     console.error(err);
     res.status(500).send(err.message);
