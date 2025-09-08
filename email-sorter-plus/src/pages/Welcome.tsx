@@ -25,8 +25,13 @@ const Welcome = () => {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/me`, {
-        credentials: "include", // Include cookies for session
+      
+      const token = localStorage.getItem("token"); 
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/users/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       
       if (response.ok) {
