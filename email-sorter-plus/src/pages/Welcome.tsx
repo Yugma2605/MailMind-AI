@@ -38,11 +38,9 @@ const Welcome = () => {
     try {
       
       const token = localStorage.getItem("token"); 
-      console.log(token);
+      // console.log(token);
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: "include",
       });
       
       if (response.ok) {
