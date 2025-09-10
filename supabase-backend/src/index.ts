@@ -1,9 +1,9 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import categoriesRouter from './routes/categories.js';
-import usersRouter from './routes/users.js';
-import emailsRouter from './routes/emails.js';
-import cors from "cors";
+import express, { Request, Response } from "express";
+import dotenv from "dotenv";
+import categoriesRouter from "./routes/categories.js";
+import usersRouter from "./routes/users.js";
+import emailsRouter from "./routes/emails.js";
+import cors, { CorsOptionsDelegate } from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -16,7 +16,8 @@ dotenv.config({ path: envPath });
 
 const app = express();
 const port = process.env.PORT || 3000;
-const allowedOrigins = [
+
+const allowedOrigins: string[] = [
   "https://mail-mind-ai-frontend.vercel.app",
   "http://localhost:8081",
 ];
@@ -29,8 +30,7 @@ if (process.env.FRONTEND_URL) {
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps or curl)
+    origin: (origin: any, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -40,16 +40,20 @@ app.use(
     credentials: true,
   })
 );
+
+
 app.use(cookieParser());
 app.use(express.json());
 
 // Routes
-app.use('/categories', categoriesRouter);
-app.use('/users', usersRouter);
-app.use('/emails', emailsRouter);
-app.get("/ping", (req, res) => {
+app.use("/categories", categoriesRouter);
+app.use("/users", usersRouter);
+app.use("/emails", emailsRouter);
+
+app.get("/ping", (req: Request, res: Response) => {
   res.send("pong");
 });
+
 app.listen(port, () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
