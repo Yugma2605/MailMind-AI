@@ -30,7 +30,7 @@ if (process.env.FRONTEND_URL) {
 
 app.use(
   cors({
-    origin: (origin: any, callback) => {
+    origin: (origin: any, callback: any) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
