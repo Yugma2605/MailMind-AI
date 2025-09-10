@@ -74,13 +74,11 @@ router.get("/google/callback", async (req: Request, res: Response) => {
 
     // Create your app session (JWT or cookie)
     const session = signSessionJWT({ user_id: user.id });
-    console.log(session);
-    setSessionCookie(res, session);
-    res.cookie("token", session, {
-      httpOnly: true,  
-      secure: process.env.NODE_ENV === "production", 
-      sameSite: "none",  
-      maxAge: 7 * 24 * 60 * 60 * 1000, 
+    res.cookie("session", session, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none", 
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     // Redirect to frontend (or API response)
     res.redirect(`${process.env.FRONTEND_URL}/welcome?token=${session}`);
