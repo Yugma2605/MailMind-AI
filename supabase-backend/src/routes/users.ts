@@ -21,7 +21,7 @@ const GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
 ];
 const router = Router();
-router.get("/google", (req, res) => {
+router.get("/google", (req: Request, res: Response) => {
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
       prompt: "select_account",

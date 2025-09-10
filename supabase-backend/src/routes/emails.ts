@@ -9,7 +9,7 @@ import { Mutex } from "async-mutex";
 
 const router = Router();
 
-router.get("/gmail/recent", requireAuth(), async (req, res) => {
+router.get("/gmail/recent", requireAuth(), async (req: Request, res: Response) => {
   try {
     const user_id = (req as any).user_id;
 
