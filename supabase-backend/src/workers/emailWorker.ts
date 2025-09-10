@@ -1,18 +1,19 @@
+// src/workers/emailWorker.ts
 import { Worker, Queue } from "bullmq";
+import { redis } from "../redis/redis.js";
 import { supabase } from "../supabase/config.js";
 import { getGoogleAuth } from "../google/googleAuth.js";
 import { google } from "googleapis";
-import { redis } from "../redis/redis.js";
 import classifyEmail from "../utils/classifyEmail.js";
+
 const emailQueue = new Queue("emailQueue", { connection: redis });
 
-export const emailWorker = new Worker(
+new Worker(
   "emailQueue",
-  async (job : any) => {
-    console.log("Hi")
+  async (job: any) => {
+    console.log("📩 Processing email job:", job.id);
     const { userId, gmailId } = job.data;
-    console.log("📩 Processing email job:", job.id, "for user:", userId);
-
+    
     const auth = await getGoogleAuth(userId);
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -48,18 +49,14 @@ export const emailWorker = new Worker(
       classification: JSON.stringify(classification),
     });
 
-    // Check backlog
     const backlog = await emailQueue.getWaitingCount();
-    console.log(
-      `✅ Processed email ${gmailId} for user ${userId}. 📊 Remaining backlog: ${backlog}`
-    );
+    console.log(`✅ Processed email ${gmailId} for user ${userId}. Remaining backlog: ${backlog}`);
   },
   {
     connection: redis,
-    concurrency: 1, // only 1 job at a time
-    limiter: {
-      max: 1, // max 1 job
-      duration: 1000, // per 1000 ms = 1 job/sec
-    },
+    concurrency: 1,
+    limiter: { max: 1, duration: 1000 },
   }
 );
+
+console.log("🚀 Email worker started");

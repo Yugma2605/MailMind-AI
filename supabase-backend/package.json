@@ -7,7 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "worker": "tsx watch src/workers/emailWorker.ts"
+    "worker": "ts-node watch src/workers/emailWorker.ts"
   },
   "keywords": [],
   "author": "",
